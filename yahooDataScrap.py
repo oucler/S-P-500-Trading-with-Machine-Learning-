@@ -13,7 +13,14 @@ import time
 from sklearn import svm, cross_validation, neighbors
 from sklearn.ensemble import VotingClassifier, RandomForestClassifier
 
+from alpha_vantage.timeseries import TimeSeries
+from alpha_vantage.techindicators import TechIndicators
+from alpha_vantage.sectorperformance import SectorPerformances
+from alpha_vantage.cryptocurrencies import CryptoCurrencies
+import matplotlib.pyplot as plt
 
+
+stocks = []
 def save_sp500_tickers():
     resp = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     soup = bs.BeautifulSoup(resp.text, 'lxml')
@@ -41,15 +48,15 @@ def get_data_from_yahoo(reload_sp500=False):
     if not os.path.exists('stock_dfs'):
         os.makedirs('stock_dfs')
 
-    start = dt.datetime(2001, 1, 1)
-    end = dt.datetime(2017, 10, 25)
+    start = dt.datetime(2017, 8, 16)
+    end = dt.datetime(2017, 11, 16)
     
     for ticker in tickers:
         # just in case your connection breaks, we'd like to save our progress!
         if not os.path.exists('stock_dfs/{}.csv'.format(ticker)):
             try:
+                #print ("ticker: {}".format(ticker))
                 df = web.DataReader(ticker, "yahoo", start, end)
-                #time.sleep(1)
                 df.to_csv('stock_dfs/{}.csv'.format(ticker))
             except:
                 pass
@@ -85,6 +92,23 @@ def compile_data():
     main_df.to_csv('sp500_joined_closes.csv')
     
 #compile_data()
+def compile_perct_data():
+    hm_days = 7
+    with open("sp500tickers.pickle","rb") as f:
+        tickers = pickle.load(f)
+
+    df = pd.read_csv('sp500_joined_closes.csv', index_col=0)
+    tickers = df.columns.values.tolist()
+    main_df = pd.DataFrame()
+    df.fillna(0, inplace=True)
+    for count, ticker in enumerate(tickers):
+        for i in range(1,hm_days+1):
+            df['{}_{}d'.format(ticker,i)] = (df[ticker].shift(-i) - df[ticker]) / df[ticker]
+            
+    df.fillna(0, inplace=True)
+    df.to_csv('sp500_perct_change.csv')
+
+#compile_perct_data()
 
 def process_data_for_labels(ticker):
     hm_days = 7
@@ -100,7 +124,7 @@ def process_data_for_labels(ticker):
 
 def buy_sell_hold(*args):
     cols = [c for c in args]
-    requirement = 0.02
+    requirement = 0.04
     for col in cols:
         if col > requirement:
             return 1
@@ -110,7 +134,8 @@ def buy_sell_hold(*args):
 
 def extract_featuresets(ticker):
     tickers, df = process_data_for_labels(ticker)
-
+    start = dt.datetime(2017, 10, 20)
+    end = dt.datetime(2017, 10, 25)
     df['{}_target'.format(ticker)] = list(map( buy_sell_hold,
                                                df['{}_1d'.format(ticker)],
                                                df['{}_2d'.format(ticker)],
@@ -123,8 +148,18 @@ def extract_featuresets(ticker):
 
     vals = df['{}_target'.format(ticker)].values.tolist()
     str_vals = [str(i) for i in vals]
-    print('Data spread:',Counter(str_vals))
+    #print('Data spread:',Counter(str_vals))
+    stat = Counter(str_vals)
+    #print ("0: {}".format(stat['0']))
+    if (stat['1'] > 25):
+        #f = web.DataReader("F", 'yahoo', start, end)
+        #f.ix['2017-10-22']
+        stocks.append(ticker)
+        print('Data spread:',Counter(str_vals))
+        print ("Good stock name: {} and buy: {}".format(ticker,stat['1']))
 
+
+        
     df.fillna(0, inplace=True)
     df = df.replace([np.inf, -np.inf], np.nan)
     df.dropna(inplace=True)
@@ -162,19 +197,28 @@ def do_ml(ticker):
     print()
     return confidence
 
+#"""
+def run():
+    with open("sp500tickers.pickle","rb") as f:
+        tickers = pickle.load(f)
+    for count,ticker in enumerate(tickers):
+        try:
+            #print ("Stock Ticker: {}".format(ticker))
+            extract_featuresets(ticker)
+            #do_ml(ticker)
+        except:
+            pass
 
-with open("sp500tickers.pickle","rb") as f:
-    tickers = pickle.load(f)
-for count,ticker in enumerate(tickers):
-    try:
-        print ("Stock Ticker: {}".format(ticker))
-        do_ml(ticker)
-    except:
-        pass
-
-"""
-# examples of running:
-do_ml('XOM')
-do_ml('AAPL')
-do_ml('ABT')  
-"""
+#save_sp500_tickers()
+#print("Done with saving !!!")
+#get_data_from_yahoo()
+compile_data()
+run()
+ti = TechIndicators(key=os.environ['2DR4O54V5D5WER2T'], output_format='pandas')
+data, meta_data = ti.get_bbands(symbol='ABBV', interval='60min', time_period=60)
+data.describe()
+data.plot()
+plt.title('BBbands indicator for  MSFT stock (60 min)')
+plt.grid()
+plt.show()
+print(stocks)
