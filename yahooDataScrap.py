@@ -85,6 +85,23 @@ def compile_data():
     main_df.to_csv('sp500_joined_closes.csv')
     
 #compile_data()
+def compile_perct_data():
+    hm_days = 7
+    with open("sp500tickers.pickle","rb") as f:
+        tickers = pickle.load(f)
+
+    df = pd.read_csv('sp500_joined_closes.csv', index_col=0)
+    tickers = df.columns.values.tolist()
+    main_df = pd.DataFrame()
+    df.fillna(0, inplace=True)
+    for count, ticker in enumerate(tickers):
+        for i in range(1,hm_days+1):
+            df['{}_{}d'.format(ticker,i)] = (df[ticker].shift(-i) - df[ticker]) / df[ticker]
+            
+    df.fillna(0, inplace=True)
+    df.to_csv('sp500_perct_change.csv')
+
+#compile_perct_data()
 
 def process_data_for_labels(ticker):
     hm_days = 7
@@ -123,8 +140,14 @@ def extract_featuresets(ticker):
 
     vals = df['{}_target'.format(ticker)].values.tolist()
     str_vals = [str(i) for i in vals]
-    print('Data spread:',Counter(str_vals))
+    #print('Data spread:',Counter(str_vals))
+    stat = Counter(str_vals)
+    #print ("0: {}".format(stat['0']))
+    if (stat['1'] > 2100):
+        print('Data spread:',Counter(str_vals))
+        print ("Good stock name: {} and buy: {}".format(ticker,stat['1']))
 
+        
     df.fillna(0, inplace=True)
     df = df.replace([np.inf, -np.inf], np.nan)
     df.dropna(inplace=True)
@@ -162,19 +185,15 @@ def do_ml(ticker):
     print()
     return confidence
 
-
+#"""
 with open("sp500tickers.pickle","rb") as f:
     tickers = pickle.load(f)
 for count,ticker in enumerate(tickers):
     try:
-        print ("Stock Ticker: {}".format(ticker))
-        do_ml(ticker)
+        #print ("Stock Ticker: {}".format(ticker))
+        extract_featuresets(ticker)
+        #do_ml(ticker)
     except:
         pass
 
-"""
-# examples of running:
-do_ml('XOM')
-do_ml('AAPL')
-do_ml('ABT')  
-"""
+#"""
