@@ -158,7 +158,6 @@ def extract_featuresets(ticker):
         print('Data spread:',Counter(str_vals))
         print ("Good stock name: {} and buy: {}".format(ticker,stat['1']))
 
-
         
     df.fillna(0, inplace=True)
     df = df.replace([np.inf, -np.inf], np.nan)
@@ -222,3 +221,14 @@ plt.title('BBbands indicator for  MSFT stock (60 min)')
 plt.grid()
 plt.show()
 print(stocks)
+with open("sp500tickers.pickle","rb") as f:
+    tickers = pickle.load(f)
+for count,ticker in enumerate(tickers):
+    try:
+        #print ("Stock Ticker: {}".format(ticker))
+        extract_featuresets(ticker)
+        #do_ml(ticker)
+    except:
+        pass
+
+#"""
